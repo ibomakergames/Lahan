@@ -47,12 +47,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         window.statusBarColor = android.graphics.Color.rgb(9, 10, 12)
         window.navigationBarColor = android.graphics.Color.rgb(9, 10, 12)
-        setContent { Lah nApp() }
+        setContent { LahnApp() }
     }
 }
 
 @Composable
-private fun Lah nApp() {
+private fun LahnApp() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val player = remember { ExoPlayer.Builder(context).build() }
@@ -224,4 +224,4 @@ private fun downloadTrack(context: Context, track: Track) {
     } catch (_: Exception) { }
 }
 
-private fun safeName(value: String): String = value.replace(Regex("[\\\\/:*?\\"<>|]"), "_").take(70)
+private fun safeName(value: String): String = value.replace("/", "_").replace("\\\\", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace("\\\"","_").replace("<", "_").replace(">", "_").replace("|", "_").take(70)
