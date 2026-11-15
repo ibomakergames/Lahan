@@ -224,4 +224,4 @@ private fun downloadTrack(context: Context, track: Track) {
     } catch (_: Exception) { }
 }
 
-private fun safeName(value: String): String = value.replace("/", "_").replace("\\\\", "_").replace(":", "_").replace("*", "_").replace("?", "_").replace("\\\"","_").replace("<", "_").replace(">", "_").replace("|", "_").take(70)
+private fun safeName(value: String): String = value.map { if (it in charArrayOf('/', '\\', ':', '*', '?', '"', '<', '>', '|')) '_' else it }.joinToString("").take(70)
