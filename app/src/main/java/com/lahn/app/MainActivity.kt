@@ -277,7 +277,10 @@ private fun loadDownloads(context: Context): List<DownloadItem> {
         val titleCol = it.getColumnIndex(DownloadManager.COLUMN_TITLE)
         val statusCol = it.getColumnIndex(DownloadManager.COLUMN_STATUS)
         val uriCol = it.getColumnIndex(DownloadManager.COLUMN_LOCAL_URI)
+        val descriptionCol = it.getColumnIndex(DownloadManager.COLUMN_DESCRIPTION)
         while (it.moveToNext()) {
+            val description = if (descriptionCol >= 0) it.getString(descriptionCol).orEmpty() else ""
+            if (!description.contains("لَحْن")) continue
             val status = when (it.getInt(statusCol)) {
                 DownloadManager.STATUS_SUCCESSFUL -> "اكتمل التنزيل"
                 DownloadManager.STATUS_FAILED -> "فشل التنزيل"
