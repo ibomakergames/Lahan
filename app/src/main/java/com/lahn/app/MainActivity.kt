@@ -242,7 +242,7 @@ private fun TrackRow(track: Track, isSaved: Boolean, onPlay: () -> Unit, onSave:
 
 @Composable
 private fun EmptyState(text: String) {
-    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().heightIn(min = 260.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Icon(Icons.Default.Headphones, null, tint = Color(0xFF555B64), modifier = Modifier.size(60.dp))
             Spacer(Modifier.height(12.dp))
