@@ -5,6 +5,9 @@ import android.content.Context
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.webkit.WebChromeClient
+import android.webkit.WebView
+import android.webkit.WebViewClient
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
@@ -26,6 +29,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import kotlinx.coroutines.Dispatchers
@@ -67,11 +71,13 @@ private fun LahnApp() {
     var loading by remember { mutableStateOf(false) }
     var message by remember { mutableStateOf("ابحث عن أغنيتك المفضلة") }
     var tab by remember { mutableIntStateOf(0) }
+    var youtubeQuery by remember { mutableStateOf("موسيقى") }
+    var youtubeWebView by remember { mutableStateOf<WebView?>(null) }
 
     DisposableEffect(Unit) { onDispose { player.release() } }
     LaunchedEffect(tab) {
-        if (tab == 2) downloads = loadDownloads(context)
-        if (tab == 3) library = loadLibrary(context)
+        if (tab == 3) downloads = loadDownloads(context)
+        if (tab == 4) library = loadLibrary(context)
     }
 
     fun play(track: Track) {
@@ -91,7 +97,7 @@ private fun LahnApp() {
                 containerColor = Ink,
                 bottomBar = {
                     NavigationBar(containerColor = Panel, contentColor = Silver) {
-                        listOf(Icons.Default.Home to "الرئيسية", Icons.Default.Search to "البحث", Icons.Default.Download to "التنزيلات", Icons.Default.LibraryMusic to "مكتبتي").forEachIndexed { index, item ->
+                        listOf(Icons.Default.Home to "الرئيسية", Icons.Default.Search to "البحث", Icons.Default.PlayCircle to "يوتيوب", Icons.Default.Download to "التنزيلات", Icons.Default.LibraryMusic to "مكتبتي").forEachIndexed { index, item ->
                             NavigationBarItem(
                                 selected = tab == index,
                                 onClick = { tab = index },
@@ -115,7 +121,7 @@ private fun LahnApp() {
                         }
                     }
                     Spacer(Modifier.height(26.dp))
-                    Text(when(tab) { 0 -> "اكتشف الموسيقى"; 1 -> "ابحث واستمع"; 2 -> "التنزيلات"; else -> "مكتبتك" }, fontSize = 22.sp, fontWeight = FontWeight.Bold)
+                    Text(when(tab) { 0 -> "اكتشف الموسيقى"; 1 -> "ابحث واستمع"; 2 -> "يوتيوب"; 3 -> "التنزيلات"; else -> "مكتبتك" }, fontSize = 22.sp, fontWeight = FontWeight.Bold)
                     Spacer(Modifier.height(14.dp))
 
                     when (tab) {
@@ -158,13 +164,24 @@ private fun LahnApp() {
                                             }
                                         },
                                         onDownload = {
-                                            downloadTrack(context, track)
-                                            scope.launch { kotlinx.coroutines.delay(700); downloads = loadDownloads(context) }
+                                            message = downloadTrack(context, track)
+                                            scope.launch { kotlinx.coroutines.delay(900); downloads = loadDownloads(context) }
                                         })
                                 }
                             }
                         }
                         2 -> {
+                            Text("ابحث وشاهد عبر يوتيوب", color = Muted, fontSize = 12.sp)
+                            Spacer(Modifier.height(10.dp))
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                OutlinedTextField(value = youtubeQuery, onValueChange = { youtubeQuery = it }, modifier = Modifier.weight(1f), placeholder = { Text("ابحث في يوتيوب", color = Muted) }, singleLine = true, shape = RoundedCornerShape(14.dp), colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Silver, unfocusedBorderColor = Color(0xFF343840), focusedTextColor = Silver, unfocusedTextColor = Silver, cursorColor = Silver))
+                                IconButton(onClick = { val term = URLEncoder.encode(youtubeQuery.ifBlank { "موسيقى" }, "UTF-8"); youtubeWebView?.loadUrl("https://m.youtube.com/results?search_query=$term") }) { Icon(Icons.Default.Search, "بحث يوتيوب", tint = Silver) }
+                            }
+                            Spacer(Modifier.height(10.dp))
+                            AndroidView(modifier = Modifier.weight(1f).fillMaxWidth().background(Panel, RoundedCornerShape(14.dp)), factory = { ctx -> WebView(ctx).apply { settings.javaScriptEnabled = true; settings.domStorageEnabled = true; settings.mediaPlaybackRequiresUserGesture = true; webViewClient = WebViewClient(); webChromeClient = WebChromeClient(); loadUrl("https://m.youtube.com/results?search_query=music"); youtubeWebView = this } }, update = { youtubeWebView = it })
+                            Text("المشاهدة عبر يوتيوب الرسمي. تنزيل فيديوهات يوتيوب غير متاح داخل التطبيق.", color = Muted, fontSize = 10.sp)
+                        }
+                        3 -> {
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text("الملفات التي نزّلتها عبر لَحْن", color = Muted, fontSize = 12.sp, modifier = Modifier.weight(1f))
                                 IconButton(onClick = { downloads = loadDownloads(context) }) { Icon(Icons.Default.Refresh, "تحديث", tint = Silver) }
@@ -194,7 +211,7 @@ private fun LahnApp() {
                                             library = library.filterNot { it.preview == track.preview }
                                             saveLibrary(context, library)
                                         },
-                                        onDownload = { downloadTrack(context, track) })
+                                        onDownload = { message = downloadTrack(context, track) })
                                 }
                             }
                         }
@@ -313,17 +330,14 @@ private suspend fun searchTracks(term: String): List<Track> = withContext(Dispat
     } catch (_: Exception) { emptyList() }
 }
 
-private fun downloadTrack(context: Context, track: Track) {
-    try {
-        val request = DownloadManager.Request(Uri.parse(track.preview))
-            .setTitle(track.title)
-            .setDescription("تنزيل معاينة صوتية من لَحْن")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-            .setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "LAHN/${safeName(track.title)}.m4a")
-            .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(false)
-        (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
-    } catch (_: Exception) { }
+private fun downloadTrack(context: Context, track: Track): String {
+    return try {
+        val uri = Uri.parse(track.preview)
+        require(uri.scheme == "https" && !uri.host.isNullOrBlank()) { "رابط التنزيل غير صالح أو غير آمن" }
+        val request = DownloadManager.Request(uri).setTitle(track.title).setDescription("لَحْن | تنزيل معاينة صوتية").setMimeType("audio/mp4").setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED).setDestinationInExternalPublicDir(Environment.DIRECTORY_MUSIC, "LAHN/${safeName(track.title)}.m4a").setAllowedOverMetered(true).setAllowedOverRoaming(false)
+        val id = (context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
+        if (id > 0L) "بدأ تنزيل ${track.title}" else "لم يبدأ التنزيل؛ حاول مرة أخرى"
+    } catch (e: Exception) { "تعذر بدء التنزيل: ${e.localizedMessage ?: "خطأ غير معروف"}" }
 }
 
 private fun safeName(value: String): String = value.map { if (it in charArrayOf('/', '\\', ':', '*', '?', '"', '<', '>', '|')) '_' else it }.joinToString("").take(70)
